@@ -1,0 +1,51 @@
+name: CI/CD Pipeline
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+  push:
+    branches:
+      - main
+
+# El token de Actions es de solo lectura por defecto. Cada job pide lo que necesita.
+permissions:
+  contents: read
+
+jobs:
+  # Compila, corre Checkstyle, el Javadoc y todas las pruebas. CatalogApiTest levanta Postgres con Dev
+  # Services de Quarkus, que usa el Docker del runner.
+  build:
+    uses: ahincho/nova-shared-02-pipelines/.github/workflows/reusable-build-gradle.yml@main
+    secrets: inherit
+
+  # La extensión de Nova trae un módulo de deployment compilado para Java 25, que Quarkus carga en la JVM de
+  # Gradle: la matriz valida solo Java 25 (ADR-003).
+  matrix:
+    if: github.event_name == 'pull_request'
+    uses: ahincho/nova-shared-02-pipelines/.github/workflows/reusable-build-matrix.yml@main
+    with:
+      build-tool: gradle
+      java-versions: '["25"]'
+    secrets: inherit
+
+  owasp:
+    if: github.event_name == 'pull_request'
+    uses: ahincho/nova-shared-02-pipelines/.github/workflows/reusable-owasp-check.yml@main
+    with:
+      build-tool: gradle
+    secrets: inherit
+
+  sbom:
+    if: github.event_name == 'pull_request'
+    # reusable-sbom.yml declara contents: write para adjuntar el SBOM a un release.
+    permissions:
+      contents: write
+    uses: ahincho/nova-shared-02-pipelines/.github/workflows/reusable-sbom.yml@main
+    with:
+      build-tool: gradle
+    secrets: inherit
