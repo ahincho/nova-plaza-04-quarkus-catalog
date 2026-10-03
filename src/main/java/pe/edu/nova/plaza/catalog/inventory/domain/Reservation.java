@@ -22,6 +22,8 @@ import java.util.UUID;
  * @param createdAt  cuándo se reservó
  * @param expiresAt  cuándo deja de apartar stock si sigue {@code HELD}
  * @param lines      las líneas, con el precio del momento
+ * @param idempotencyKey la clave de la compra que la pidió, o {@code null}: con ella, repetir la compra devuelve
+ *                   esta misma reserva
  */
 public record Reservation(
         UUID id,
@@ -30,7 +32,8 @@ public record Reservation(
         String currency,
         Instant createdAt,
         Instant expiresAt,
-        List<ReservationLine> lines) {
+        List<ReservationLine> lines,
+        String idempotencyKey) {
 
     /** Crea la reserva. */
     public Reservation {
@@ -47,6 +50,7 @@ public record Reservation(
      * Aparta stock para una compra.
      *
      * @param customerId el cliente
+     * @param idempotencyKey la clave de la compra, o {@code null}
      * @param currency   la moneda de las líneas
      * @param lines      las líneas
      * @param now        el momento de la reserva
@@ -54,11 +58,23 @@ public record Reservation(
      * @return la reserva, todavía sin guardar
      */
     public static Reservation hold(
-            String customerId, String currency, List<ReservationLine> lines, Instant now, Duration ttl) {
+            String customerId,
+            String idempotencyKey,
+            String currency,
+            List<ReservationLine> lines,
+            Instant now,
+            Duration ttl) {
         // Postgres guarda microsegundos: con la misma precisión, lo que se lee es lo que se escribió.
         Instant createdAt = now.truncatedTo(ChronoUnit.MICROS);
         return new Reservation(
-                UUID.randomUUID(), customerId, ReservationStatus.HELD, currency, createdAt, createdAt.plus(ttl), lines);
+                UUID.randomUUID(),
+                customerId,
+                ReservationStatus.HELD,
+                currency,
+                createdAt,
+                createdAt.plus(ttl),
+                lines,
+                idempotencyKey);
     }
 
     /**
@@ -99,6 +115,6 @@ public record Reservation(
     }
 
     private Reservation withStatus(ReservationStatus next) {
-        return new Reservation(id, customerId, next, currency, createdAt, expiresAt, lines);
+        return new Reservation(id, customerId, next, currency, createdAt, expiresAt, lines, idempotencyKey);
     }
 }

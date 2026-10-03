@@ -8,13 +8,15 @@ import pe.edu.nova.plaza.catalog.inventory.domain.Reservation;
 public interface StockReservations {
 
     /**
-     * Aparta el stock de una compra y fija los precios del momento.
+     * Aparta el stock de una compra y fija los precios del momento. Con la clave de la compra, repetirla con los
+     * mismos productos devuelve la misma reserva, y con otros es un 422 {@code IDEMPOTENCY_KEY_REUSED}.
      *
-     * @param customerId el cliente que compra
-     * @param items      los productos y sus cantidades; un producto repetido suma sus cantidades
+     * @param customerId     el cliente que compra
+     * @param idempotencyKey la clave de la compra, o {@code null}
+     * @param items          los productos y sus cantidades; un producto repetido suma sus cantidades
      * @return la reserva
      */
-    Reservation reserve(String customerId, List<Item> items);
+    Reservation reserve(String customerId, String idempotencyKey, List<Item> items);
 
     /**
      * Confirma una reserva: el stock sale del almacén. Repetirla devuelve la misma reserva.

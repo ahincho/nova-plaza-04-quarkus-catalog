@@ -1,6 +1,7 @@
 package pe.edu.nova.plaza.catalog.inventory.exception;
 
 import java.util.UUID;
+import pe.edu.nova.java.libs.api.standard.error.ApplicationError;
 import pe.edu.nova.java.libs.api.standard.error.DomainError;
 
 /**
@@ -17,6 +18,9 @@ public final class CatalogErrors {
 
     /** Una reserva no puede mezclar monedas. */
     public static final String MIXED_CURRENCIES = "MIXED_CURRENCIES";
+
+    /** La misma clave de compra llegó con otros productos. */
+    public static final String IDEMPOTENCY_KEY_REUSED = "IDEMPOTENCY_KEY_REUSED";
 
     /** La reserva no existe. */
     public static final String RESERVATION_NOT_FOUND = "RESERVATION_NOT_FOUND";
@@ -63,6 +67,18 @@ public final class CatalogErrors {
      */
     public static DomainError mixedCurrencies() {
         return DomainError.ruleViolation(MIXED_CURRENCIES, "Una reserva no puede mezclar productos de distintas monedas");
+    }
+
+    /**
+     * La misma clave de compra llegó con otros productos: 422, como en pedidos (ADR-047).
+     *
+     * @param idempotencyKey la clave
+     * @return el error
+     */
+    public static ApplicationError idempotencyKeyReused(String idempotencyKey) {
+        return ApplicationError.unprocessable(
+                IDEMPOTENCY_KEY_REUSED,
+                "La clave " + idempotencyKey + " ya se usó para reservar otros productos");
     }
 
     /**

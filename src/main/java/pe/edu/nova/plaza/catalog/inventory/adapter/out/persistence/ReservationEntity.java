@@ -41,6 +41,9 @@ public class ReservationEntity {
     @Column(name = "expires_at", nullable = false)
     Instant expiresAt;
 
+    @Column(name = "idempotency_key")
+    String idempotencyKey;
+
     @Version
     long version;
 
@@ -59,6 +62,7 @@ public class ReservationEntity {
         entity.currency = reservation.currency();
         entity.createdAt = reservation.createdAt();
         entity.expiresAt = reservation.expiresAt();
+        entity.idempotencyKey = reservation.idempotencyKey();
         reservation.lines().forEach(line -> entity.lines.add(ReservationLineEntity.of(entity, line)));
         return entity;
     }
@@ -71,6 +75,7 @@ public class ReservationEntity {
                 currency,
                 createdAt,
                 expiresAt,
-                lines.stream().map(ReservationLineEntity::toDomain).toList());
+                lines.stream().map(ReservationLineEntity::toDomain).toList(),
+                idempotencyKey);
     }
 }

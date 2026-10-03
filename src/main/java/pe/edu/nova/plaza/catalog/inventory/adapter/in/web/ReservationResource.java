@@ -27,6 +27,9 @@ public class ReservationResource {
     /** El cliente que el BFF autenticó. */
     public static final String CUSTOMER_HEADER = "X-Customer-Id";
 
+    /** La clave de la compra: repetirla con los mismos productos devuelve la misma reserva. */
+    public static final String IDEMPOTENCY_HEADER = "Idempotency-Key";
+
     private final StockReservations reservations;
 
     /**
@@ -42,17 +45,24 @@ public class ReservationResource {
      * Aparta el stock de una compra y devuelve los precios del momento. Sin stock suficiente, 409
      * {@code OUT_OF_STOCK}.
      *
-     * @param customerId el cliente
-     * @param request    los productos y sus cantidades
+     * @param customerId     el cliente
+     * @param idempotencyKey la clave de la compra, opcional
+     * @param request        los productos y sus cantidades
      * @return la reserva, con 201
      */
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     public Response reserve(
             @HeaderParam(CUSTOMER_HEADER) @NotBlank String customerId,
+            @HeaderParam(IDEMPOTENCY_HEADER) String idempotencyKey,
             @NotNull @Valid CreateReservationRequest request) {
-        ReservationResponse body = ReservationResponse.of(reservations.reserve(customerId, request.toItems()));
+        ReservationResponse body = ReservationResponse.of(
+                reservations.reserve(customerId, blankToNull(idempotencyKey), request.toItems()));
         return Response.status(Response.Status.CREATED).entity(body).build();
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.strip();
     }
 
     /**

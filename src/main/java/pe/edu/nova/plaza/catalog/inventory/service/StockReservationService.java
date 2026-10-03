@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.Function;
@@ -53,10 +54,24 @@ public class StockReservationService implements StockReservations {
 
     @Override
     @Transactional
-    public Reservation reserve(String customerId, List<Item> items) {
+    public Reservation reserve(String customerId, String idempotencyKey, List<Item> items) {
         // Un producto repetido es una sola línea, con la suma de sus cantidades.
         Map<String, Integer> requested =
                 items.stream().collect(Collectors.toMap(Item::sku, Item::quantity, Integer::sum, TreeMap::new));
+
+        // La misma compra, repetida: la reserva es la que ya hizo, esté como esté.
+        if (idempotencyKey != null) {
+            Optional<Reservation> previous = reservations.findByKey(customerId, idempotencyKey);
+            if (previous.isPresent()) {
+                Map<String, Integer> reserved = previous.get().lines().stream()
+                        .collect(Collectors.toMap(ReservationLine::sku, ReservationLine::quantity));
+                if (!reserved.equals(requested)) {
+                    throw CatalogErrors.idempotencyKeyReused(idempotencyKey);
+                }
+                return previous.get();
+            }
+        }
+
         Map<String, Product> locked =
                 products.lock(requested.keySet()).stream().collect(Collectors.toMap(Product::sku, Function.identity()));
         Instant now = clock.instant();
@@ -71,7 +86,7 @@ public class StockReservationService implements StockReservations {
             throw CatalogErrors.mixedCurrencies();
         }
 
-        Reservation reservation = Reservation.hold(customerId, currencies.get(0), lines, now, ttl);
+        Reservation reservation = Reservation.hold(customerId, idempotencyKey, currencies.get(0), lines, now, ttl);
         reservations.save(reservation);
         return reservation;
     }

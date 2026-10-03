@@ -140,6 +140,37 @@ class CatalogApiTest {
     }
 
     @Test
+    void theSamePurchaseKeyGetsTheSameReservation() {
+        String body = "{\"items\":[{\"sku\":\"PEN-006\",\"quantity\":2}]}";
+        String first = given().header(CUSTOMER, "customer-5")
+                .header("Idempotency-Key", "purchase-5")
+                .contentType(ContentType.JSON)
+                .body(body)
+                .post("/v1/reservations")
+                .then()
+                .statusCode(201)
+                .extract()
+                .path("data.id");
+
+        given().header(CUSTOMER, "customer-5")
+                .header("Idempotency-Key", "purchase-5")
+                .contentType(ContentType.JSON)
+                .body(body)
+                .post("/v1/reservations")
+                .then()
+                .statusCode(201)
+                .body("data.id", equalTo(first));
+        given().header(CUSTOMER, "customer-5")
+                .header("Idempotency-Key", "purchase-5")
+                .contentType(ContentType.JSON)
+                .body("{\"items\":[{\"sku\":\"PEN-006\",\"quantity\":3}]}")
+                .post("/v1/reservations")
+                .then()
+                .statusCode(422)
+                .body("errors[0].code", equalTo("IDEMPOTENCY_KEY_REUSED"));
+    }
+
+    @Test
     void theLastPageSaysItHasNoNextCursor() {
         given().queryParam("limit", 100).get("/v1/products")
                 .then()

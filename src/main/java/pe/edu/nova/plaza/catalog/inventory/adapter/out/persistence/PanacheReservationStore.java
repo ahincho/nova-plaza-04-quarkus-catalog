@@ -21,6 +21,13 @@ public class PanacheReservationStore implements ReservationStore, PanacheReposit
     }
 
     @Override
+    public Optional<Reservation> findByKey(String customerId, String idempotencyKey) {
+        return find("customerId = ?1 and idempotencyKey = ?2", customerId, idempotencyKey)
+                .firstResultOptional()
+                .map(ReservationEntity::toDomain);
+    }
+
+    @Override
     public void save(Reservation reservation) {
         ReservationEntity existing = findById(reservation.id());
         if (existing == null) {
