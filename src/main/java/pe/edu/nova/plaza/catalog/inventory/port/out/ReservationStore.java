@@ -16,6 +16,15 @@ public interface ReservationStore {
     Optional<Reservation> lock(UUID id);
 
     /**
+     * La reserva que pidió una compra, por su clave: repetir la compra la encuentra.
+     *
+     * @param customerId     el cliente
+     * @param idempotencyKey la clave de la compra
+     * @return la reserva, si esa compra ya reservó
+     */
+    Optional<Reservation> findByKey(String customerId, String idempotencyKey);
+
+    /**
      * Guarda una reserva nueva o su estado nuevo.
      *
      * @param reservation la reserva

@@ -92,6 +92,13 @@ final class InMemoryStores {
         final Map<UUID, Reservation> rows = new HashMap<>();
 
         @Override
+        public Optional<Reservation> findByKey(String customerId, String idempotencyKey) {
+            return rows.values().stream()
+                    .filter(r -> customerId.equals(r.customerId()) && idempotencyKey.equals(r.idempotencyKey()))
+                    .findFirst();
+        }
+
+        @Override
         public Optional<Reservation> lock(UUID id) {
             return Optional.ofNullable(rows.get(id));
         }

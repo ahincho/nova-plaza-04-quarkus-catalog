@@ -30,6 +30,7 @@ class DomainTest {
     void aHeldReservationExpiresAtItsDeadlineButAConfirmedOneNever() {
         Reservation held = Reservation.hold(
                 "customer-1",
+                null,
                 "PEN",
                 List.of(new ReservationLine("MUG-001", 2, new BigDecimal("25.50"))),
                 NOW,

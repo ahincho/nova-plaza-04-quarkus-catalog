@@ -39,7 +39,7 @@ class StockReservationServiceTest {
 
     @Test
     void aReservationTakesTheCatalogPricesAndHoldsTheStockForTenMinutes() {
-        Reservation reservation = service.reserve("customer-1", List.of(new Item("MUG-001", 2), new Item("TEE-002", 1)));
+        Reservation reservation = service.reserve("customer-1", null, List.of(new Item("MUG-001", 2), new Item("TEE-002", 1)));
 
         assertEquals(ReservationStatus.HELD, reservation.status());
         assertEquals("PEN", reservation.currency());
@@ -56,17 +56,44 @@ class StockReservationServiceTest {
 
     @Test
     void aRepeatedProductIsOneLineWithTheSumOfItsQuantities() {
-        Reservation reservation = service.reserve("customer-1", List.of(new Item("MUG-001", 2), new Item("MUG-001", 3)));
+        Reservation reservation = service.reserve("customer-1", null, List.of(new Item("MUG-001", 2), new Item("MUG-001", 3)));
 
         assertEquals(List.of(new ReservationLine("MUG-001", 5, new BigDecimal("25.50"))), reservation.lines());
     }
 
     @Test
+    void theSamePurchaseRepeatedGetsTheSameReservationWithoutHoldingMore() {
+        Reservation first = service.reserve("customer-1", "purchase-1", List.of(new Item("TEE-002", 3)));
+        service.confirm(first.id());
+
+        Reservation again = service.reserve("customer-1", "purchase-1", List.of(new Item("TEE-002", 3)));
+
+        assertEquals(first.id(), again.id());
+        assertEquals(ReservationStatus.CONFIRMED, again.status());
+        assertEquals(1, reservations.rows.size());
+        assertEquals(2, products.rows.get("TEE-002").stock());
+    }
+
+    @Test
+    void theSameKeyWithOtherProductsIsRejectedAndAnotherCustomersKeyIsAnotherPurchase() {
+        service.reserve("customer-1", "purchase-1", List.of(new Item("MUG-001", 1)));
+
+        pe.edu.nova.java.libs.api.standard.error.ApplicationError reused = assertThrows(
+                pe.edu.nova.java.libs.api.standard.error.ApplicationError.class,
+                () -> service.reserve("customer-1", "purchase-1", List.of(new Item("MUG-001", 2))));
+        Reservation theirs = service.reserve("customer-2", "purchase-1", List.of(new Item("MUG-001", 2)));
+
+        assertEquals(CatalogErrors.IDEMPOTENCY_KEY_REUSED, reused.code().orElseThrow());
+        assertEquals("customer-2", theirs.customerId());
+        assertEquals(2, reservations.rows.size());
+    }
+
+    @Test
     void reservingMoreThanWhatIsAvailableIsOutOfStock() {
-        service.reserve("customer-1", List.of(new Item("TEE-002", 4)));
+        service.reserve("customer-1", null, List.of(new Item("TEE-002", 4)));
 
         DomainError error =
-                assertThrows(DomainError.class, () -> service.reserve("customer-2", List.of(new Item("TEE-002", 2))));
+                assertThrows(DomainError.class, () -> service.reserve("customer-2", null, List.of(new Item("TEE-002", 2))));
 
         assertEquals(DomainError.Type.CONFLICT, error.type());
         assertEquals(CatalogErrors.OUT_OF_STOCK, error.code().orElseThrow());
@@ -76,10 +103,10 @@ class StockReservationServiceTest {
     @Test
     void anUnknownProductOrMixedCurrenciesAreRejected() {
         DomainError missing =
-                assertThrows(DomainError.class, () -> service.reserve("customer-1", List.of(new Item("NOPE-000", 1))));
+                assertThrows(DomainError.class, () -> service.reserve("customer-1", null, List.of(new Item("NOPE-000", 1))));
         DomainError mixed = assertThrows(
                 DomainError.class,
-                () -> service.reserve("customer-1", List.of(new Item("MUG-001", 1), new Item("USD-100", 1))));
+                () -> service.reserve("customer-1", null, List.of(new Item("MUG-001", 1), new Item("USD-100", 1))));
 
         assertEquals(CatalogErrors.PRODUCT_NOT_FOUND, missing.code().orElseThrow());
         assertEquals(DomainError.Type.RULE_VIOLATION, mixed.type());
@@ -88,7 +115,7 @@ class StockReservationServiceTest {
 
     @Test
     void confirmingTakesTheStockOutAndRepeatingItChangesNothing() {
-        Reservation reservation = service.reserve("customer-1", List.of(new Item("MUG-001", 3)));
+        Reservation reservation = service.reserve("customer-1", null, List.of(new Item("MUG-001", 3)));
 
         Reservation confirmed = service.confirm(reservation.id());
         Reservation again = service.confirm(reservation.id());
@@ -101,7 +128,7 @@ class StockReservationServiceTest {
 
     @Test
     void anExpiredReservationNoLongerHoldsStockAndCannotBeConfirmed() {
-        Reservation reservation = service.reserve("customer-1", List.of(new Item("TEE-002", 5)));
+        Reservation reservation = service.reserve("customer-1", null, List.of(new Item("TEE-002", 5)));
         clock.advance(TTL);
 
         assertEquals(5, catalog.find("TEE-002").available());
@@ -112,7 +139,7 @@ class StockReservationServiceTest {
 
     @Test
     void releasingGivesTheStockBackAndRepeatingItChangesNothing() {
-        Reservation reservation = service.reserve("customer-1", List.of(new Item("TEE-002", 5)));
+        Reservation reservation = service.reserve("customer-1", null, List.of(new Item("TEE-002", 5)));
 
         Reservation released = service.release(reservation.id());
 
@@ -125,7 +152,7 @@ class StockReservationServiceTest {
 
     @Test
     void aConfirmedReservationCannotBeReleased() {
-        Reservation reservation = service.reserve("customer-1", List.of(new Item("MUG-001", 1)));
+        Reservation reservation = service.reserve("customer-1", null, List.of(new Item("MUG-001", 1)));
         service.confirm(reservation.id());
 
         DomainError error = assertThrows(DomainError.class, () -> service.release(reservation.id()));
@@ -144,7 +171,7 @@ class StockReservationServiceTest {
 
     @Test
     void theCatalogScrollsByCodeWithWhatIsAvailable() {
-        service.reserve("customer-1", List.of(new Item("MUG-001", 4)));
+        service.reserve("customer-1", null, List.of(new Item("MUG-001", 4)));
 
         CursorPage<ProductView> first = catalog.page(CursorRequest.first(2));
         CursorPage<ProductView> second = catalog.page(CursorRequest.after(first.nextCursor(), 2));
