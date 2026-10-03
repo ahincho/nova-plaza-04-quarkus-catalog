@@ -27,6 +27,7 @@ repositories {
     nova("nova-java-01-api-standard")
     nova("nova-java-23-secrets")
     nova("nova-java-28-persistence")
+    nova("nova-java-26-outbox")
 }
 
 val novaBom = "4.2.1"
@@ -50,6 +51,9 @@ dependencies {
     runtimeOnly("pe.edu.nova.java.libs:nova-secrets-vault")
     // El contrato de la paginación por cursor, el mismo que pedidos (ADR-054): el núcleo es Java puro.
     implementation("pe.edu.nova.java.libs:nova-persistence:1.0.0")
+    // Los eventos de pedidos llegan por Kafka, y el inbox de Nova descarta los repetidos (ADR-048).
+    implementation("io.quarkus:quarkus-messaging-kafka")
+    implementation("pe.edu.nova.java.libs:nova-outbox:0.1.0")
 
     testImplementation("io.quarkus:quarkus-junit")
     testImplementation("io.rest-assured:rest-assured")
